@@ -1,0 +1,16 @@
+{
+  "name": "cemp-pq",
+  "version": "0.1.0",
+  "description": "CKB Post-Quantum Encrypted Messaging Protocol",
+  "type": "module",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "dependencies": {
+    "@ckb-ccc/core": "^0.0.14",
+    "@noble/hashes": "^1.8.0",
+    "@noble/post-quantum": "^0.2.1",
+    "molecule": "file:../molecule-js-binding"
+  }
+}
