@@ -46,7 +46,7 @@ async function liveTest() {
         await new Promise(r => setTimeout(r, 30000));
     } catch (e) {
         console.error("✘ Profile creation failed:", e.message);
-        return;
+        process.exit(1);
     }
 
     // 3. Phase 1: Send Encrypted Message (Discovery Test)
@@ -57,7 +57,12 @@ async function liveTest() {
         console.log("✔ Message Transaction Sent:", txHash);
     } catch (e) {
         console.error("✘ Message send failed:", e.message);
+        process.exit(1);
     }
+    process.exit(0);
 }
 
-liveTest().catch(console.error);
+liveTest().catch((e) => {
+    console.error(e);
+    process.exit(1);
+});

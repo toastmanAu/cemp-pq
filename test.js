@@ -11,10 +11,10 @@ async function test() {
 
     // 2. Encryption/Decryption
     const message = new TextEncoder().encode("Hello, this is a post-quantum encrypted message on CKB!");
-    const encrypted = CEMPPQ.encrypt(message, keys.publicKey);
+    const encrypted = await CEMPPQ.encrypt(message, keys.publicKey);
     console.log("✔ Message encrypted, size:", encrypted.length);
 
-    const decrypted = CEMPPQ.decrypt(encrypted, keys.secretKey);
+    const decrypted = await CEMPPQ.decrypt(encrypted, keys.secretKey);
     const decryptedStr = new TextDecoder().decode(decrypted);
     console.log("✔ Message decrypted:", decryptedStr);
 

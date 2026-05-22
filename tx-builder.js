@@ -71,9 +71,7 @@ export class MLDSASigner extends ccc.Signer {
         const sig = ml_dsa65.sign(this.secretKey, msg, new TextEncoder().encode('CKB-MLDSA-LOCK'));
         const witness = buildWitness(this.publicKey, sig);
         
-        tx.setWitnessArgsAt(0, ccc.WitnessArgs.from({
-            lock: ccc.hexFrom(witness)
-        }));
+        tx.witnesses[0] = ccc.hexFrom(witness);
         
         return tx;
     }
@@ -88,9 +86,7 @@ export class CEMPTransactionBuilder {
      * Discovery: Fetch the recipient's ML-KEM public key from their Profile Cell.
      */
     async fetchRecipientProfile(recipientLock) {
-        // In a real implementation, we search for a cell with a specific Type Script
-        // or a specific pattern in the lock args that identifies it as a CEMP-PQ Profile.
-        // For now, we simulate the fetch.
+        const typeIdCodeHash = "0x00000000000000000000000000000000000000000000000000545950455f4944";
         const cells = await this.client.findCells({
             script: recipientLock,
             scriptType: "lock",
@@ -98,9 +94,7 @@ export class CEMPTransactionBuilder {
         });
 
         for await (const cell of cells) {
-            // Check if cell data looks like a Molecule Profile table
-            // Simplified check: data.length > (1952 + 1184)
-            if (cell.outputData.length > 3000) {
+            if (cell.cellOutput.type && cell.cellOutput.type.codeHash === typeIdCodeHash) {
                 const data = ccc.bytesFrom(cell.outputData);
                 const view = new DataView(data.buffer, data.byteOffset, data.byteLength);
                 const off_kem = view.getUint32(8, true);
@@ -118,37 +112,41 @@ export class CEMPTransactionBuilder {
         const lock = await signer.getRecommendedAddressObj();
         const profileData = serializeProfile(mlDSAPubKey, mlKEMPubKey, new TextEncoder().encode(metadata));
 
+        const placeholderType = {
+            codeHash: "0x00000000000000000000000000000000000000000000000000545950455f4944",
+            hashType: "type",
+            args: "0x0000000000000000000000000000000000000000000000000000000000000000",
+        };
+
         const tx = ccc.Transaction.from({
             outputs: [{
                 lock: lock.script,
+                type: placeholderType,
                 capacity: ccc.fixedPointFrom(0),
             }],
             outputsData: [ccc.hexFrom(profileData)]
         });
 
         await tx.completeInputsByCapacity(signer);
+
+        // Compute deterministic Type ID and replace placeholder
+        const typeIdArgs = ccc.hashTypeId(tx.inputs[0], 0);
+        tx.outputs[0].type.args = typeIdArgs;
+
         await tx.completeFeeBy(signer, feeRate);
         return tx;
     }
 
-    /**
-     * Phase 1: Create Message and Notification Cells
-     */
-    async buildSendMessageTx(senderSigner, recipientLock, message, feeRate = 1200n) {
+    async buildSendMessageTx(senderSigner, recipientLock, message, feeRate = 1200n, recipientMLKEMPubKey = null) {
         const { script: senderLock } = await senderSigner.getRecommendedAddressObj();
         
         // 1. Discover Recipient's Public Key
-        let recipientMLKEMPubKey;
-        try {
+        if (!recipientMLKEMPubKey) {
             recipientMLKEMPubKey = await this.fetchRecipientProfile(recipientLock);
-        } catch (e) {
-            // Fallback for demo/manual entry if discovery fails
-            console.warn("Profile discovery failed, using fallback.");
-            recipientMLKEMPubKey = new Uint8Array(1184).fill(0x02); 
         }
 
         // 2. Encrypt Message
-        const encryptedData = CEMPPQ.encrypt(new TextEncoder().encode(message), recipientMLKEMPubKey);
+        const encryptedData = await CEMPPQ.encrypt(new TextEncoder().encode(message), recipientMLKEMPubKey);
 
         const tx = ccc.Transaction.from({
             outputs: [

@@ -58,15 +58,15 @@ async function testBuilder() {
         const dsaPubKey = new Uint8Array(1952).fill(0x01);
         const kemPubKey = new Uint8Array(1184).fill(0x02);
         const tx = await builder.buildCreateProfileTx(mockSigner, dsaPubKey, kemPubKey, "Phill's Profile");
-        console.log("✔ Phase 0 Tx structure built");
+        console.log("✔ Phase 0 Tx structure built, capacity:", tx.outputs[0].capacity.toString(), "shannons");
     } catch (e) {
         console.log("✔ Phase 0 Tx logic verified (Expected funds error)");
     }
 
     console.log("Building Phase 1 Tx (Send Message with Discovery)...");
     try {
-        // We catch errors here because we don't have actual cells on testnet for the mock lock
-        const tx = await builder.buildSendMessageTx(mockSigner, recipientLock, "Hello CKB PQ!");
+        const dummyMLKEMPubKey = new Uint8Array(1184).fill(0x02);
+        const tx = await builder.buildSendMessageTx(mockSigner, recipientLock, "Hello CKB PQ!", 1200n, dummyMLKEMPubKey);
         console.log("✔ Phase 1 Tx structure built");
         console.log("Outputs:", tx.outputs.length);
         console.log("CellDeps:", tx.cellDeps.length);

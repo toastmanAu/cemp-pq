@@ -194,20 +194,29 @@ export class CEMPPQ {
     /**
      * Encrypt a message for a recipient using ML-KEM-768.
      */
-    static encrypt(message, recipientPublicKey) {
+    static async encrypt(message, recipientPublicKey) {
         const { cipherText: kemCiphertext, sharedSecret } = ml_kem768.encapsulate(recipientPublicKey);
         
         // Use the shared secret to derive a symmetric key (simple Blake2b for now)
         const symKey = blake2b(sharedSecret, { dkLen: 32, personalization: new TextEncoder().encode('CEMP-PQ-SYM-KEY_') });
         
-        // Simple XOR encryption for demonstration (Replace with AES-GCM/ChaCha20 for production)
-        const nonce = crypto.getRandomValues(new Uint8Array(12));
-        const ciphertext = new Uint8Array(message.length);
-        const keystream = blake2b(new Uint8Array([...symKey, ...nonce]), { dkLen: message.length });
-        
-        for (let i = 0; i < message.length; i++) {
-            ciphertext[i] = message[i] ^ keystream[i];
-        }
+        const key = await globalThis.crypto.subtle.importKey(
+            "raw",
+            symKey,
+            { name: "AES-GCM" },
+            false,
+            ["encrypt"]
+        );
+        const nonce = globalThis.crypto.getRandomValues(new Uint8Array(12));
+        const encryptedBuffer = await globalThis.crypto.subtle.encrypt(
+            {
+                name: "AES-GCM",
+                iv: nonce
+            },
+            key,
+            message
+        );
+        const ciphertext = new Uint8Array(encryptedBuffer);
 
         return serializeEncryptedMessage(kemCiphertext, nonce, ciphertext);
     }
@@ -215,7 +224,7 @@ export class CEMPPQ {
     /**
      * Decrypt a message using ML-KEM-768.
      */
-    static decrypt(encryptedData, recipientSecretKey) {
+    static async decrypt(encryptedData, recipientSecretKey) {
         const view = new DataView(encryptedData.buffer, encryptedData.byteOffset, encryptedData.byteLength);
         const off_kem = view.getUint32(4, true);
         const off_nonce = view.getUint32(8, true);
@@ -233,12 +242,23 @@ export class CEMPPQ {
         const sharedSecret = ml_kem768.decapsulate(kemCiphertext, recipientSecretKey);
         const symKey = blake2b(sharedSecret, { dkLen: 32, personalization: new TextEncoder().encode('CEMP-PQ-SYM-KEY_') });
 
-        const keystream = blake2b(new Uint8Array([...symKey, ...nonce]), { dkLen: ciphertext.length });
-        const plaintext = new Uint8Array(ciphertext.length);
-        for (let i = 0; i < ciphertext.length; i++) {
-            plaintext[i] = ciphertext[i] ^ keystream[i];
-        }
+        const key = await globalThis.crypto.subtle.importKey(
+            "raw",
+            symKey,
+            { name: "AES-GCM" },
+            false,
+            ["decrypt"]
+        );
 
-        return plaintext;
+        const decryptedBuffer = await globalThis.crypto.subtle.decrypt(
+            {
+                name: "AES-GCM",
+                iv: nonce
+            },
+            key,
+            ciphertext
+        );
+
+        return new Uint8Array(decryptedBuffer);
     }
 }
