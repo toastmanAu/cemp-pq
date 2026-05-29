@@ -33,4 +33,6 @@ async function test() {
     console.log("\nAll library tests PASSED!");
 }
 
-test().catch(console.error);
+test()
+    .then(() => process.exit(0))
+    .catch((e) => { console.error(e); process.exit(1); });

@@ -28,7 +28,7 @@ async function liveTest() {
 
     if (balance === ccc.Zero) {
         console.error("✘ Account not funded. Please fund:", address);
-        return;
+        process.exit(1);
     }
 
     const builder = new CEMPTransactionBuilder(client);
@@ -42,8 +42,8 @@ async function liveTest() {
         const txHash = await signer.sendTransaction(profileTx);
         console.log("✔ Profile Transaction Sent:", txHash);
         
-        console.log("Waiting for confirmation (30s)...");
-        await new Promise(r => setTimeout(r, 30000));
+        console.log("Waiting for confirmation + indexer (60s)...");
+        await new Promise(r => setTimeout(r, 60000));
     } catch (e) {
         console.error("✘ Profile creation failed:", e.message);
         process.exit(1);
